@@ -10,10 +10,33 @@ using namespace ci::app;
 using namespace std;
 
 class HUE {
-public:
+  public:
     bool operator()(const Colorf& a, const Colorf& b) const {
-        return rgbToHSV(a).x < rgbToHSV(b).x;
-        //return a.r < b.r;
+        return rgbToHSV(a).x > rgbToHSV(b).x;
+    }
+};
+
+class SATURATION {
+  public:
+    bool operator()(const Colorf& a, const Colorf& b) const {
+        return rgbToHSV(a).y > rgbToHSV(b).y;
+    }
+};
+
+class BRIGHTNESS {
+  public:
+    bool operator()(const Colorf& a, const Colorf& b) const {
+        return rgbToHSV(a).z > rgbToHSV(b).z;
+    }
+};
+
+class GRAYSCALE {
+  public:
+    bool operator()(const Colorf& a, const Colorf& b) const {
+        return GRAYSCALE::rgbToGrayscale(a) > GRAYSCALE::rgbToGrayscale(b);
+    }
+    static int rgbToGrayscale(const Colorf& c) {
+        return (int)((0.299*c.r + 0.587*c.g + 0.114*c.b)*256);
     }
 };
 
@@ -21,14 +44,16 @@ class P122App : public AppNative {
   public:
     void prepareSettings(Settings *settings);
 	void setup();
+	void changeImage(string name);
 	void mouseDown(MouseEvent event);
 	void mouseMove(MouseEvent event);
+	void keyDown(KeyEvent event);
 	void update();
 	void draw();
     
     ci::Surface mSurface;
-    gl::Texture mTexture;
     
+    list<ColorA> org;
     list<ColorA> colors;
     
     Vec2i mMouseLoc;
@@ -41,21 +66,27 @@ void P122App::prepareSettings(Settings *settings) {
 
 void P122App::setup()
 {
-    mSurface = Surface(loadImage(loadResource("pic1.jpg")));
-    mTexture = mSurface;
+    changeImage("pic1.jpg");
+}
+
+void P122App::changeImage(string name)
+{
+    //console() << name << std::endl;
+    
+    org.clear();
+    
+    mSurface = Surface(loadImage(loadResource(name)));
     
     Vec2i res = mSurface.getSize();
     
     for(int y=0; y < res.y; y++) {
         for(int x=0; x < res.x; x++) {
-            //console() << mSurface.getPixel(Vec2i(x, y)) << std::endl;
             ColorA c = mSurface.getPixel(Vec2i(x, y));
-            colors.push_back(c);
+            org.push_back(c);
         }
     }
     
-    //colors.sort(HUE());
-    //console() << (rgbToHSV(*colors.begin()).x <  rgbToHSV(*colors.end()).x) << std::endl;
+    colors = org;
 }
 
 void P122App::mouseDown(MouseEvent event)
@@ -64,6 +95,35 @@ void P122App::mouseDown(MouseEvent event)
 
 void P122App::mouseMove(MouseEvent event) {
     mMouseLoc = event.getPos();
+}
+
+void P122App::keyDown( KeyEvent event ) {
+    switch (event.getChar()) {
+        case '1':
+            changeImage("pic1.jpg");
+            break;
+        case '2':
+            changeImage("pic2.jpg");
+            break;
+        case '3':
+            changeImage("pic3.jpg");
+            break;
+        case '4':
+            colors = org;
+            break;
+        case '5':
+            colors.sort(HUE());
+            break;
+        case '6':
+            colors.sort(SATURATION());
+            break;
+        case '7':
+            colors.sort(BRIGHTNESS());
+            break;
+        case '8':
+            colors.sort(GRAYSCALE());
+            break;
+    }
 }
 
 void P122App::update()
@@ -76,11 +136,14 @@ void P122App::draw()
 	gl::clear( Color( 0, 0, 0 ) );
     
     Vec2i w = getWindowSize();
-    int tileCount = w.x / std::max(5, mMouseLoc.x);
-    if (tileCount < 1) tileCount = 1;
-    float rectSize = w.x / float(tileCount);
     
-    //console() << rectSize << std::endl;
+    int tileCount = w.x / std::max(5, mMouseLoc.x);
+    
+    if (tileCount < 1) tileCount = 1;
+    
+    float rectSize = w.x / float(tileCount);
+    int rectw = w.x / tileCount;
+    int dist = w.x - rectw*tileCount;
     
 	list<ColorA>::iterator p = colors.begin();
         
@@ -91,9 +154,9 @@ void P122App::draw()
             gl::color(c);
             gl::drawSolidRect(Rectf(x*rectSize, y*rectSize, x*rectSize+rectSize, y*rectSize+rectSize));
             
-            advance(p, int(rectSize));
+            advance(p, rectw);
         }
-        advance(p, int(w.x*(rectSize-1.0f)));
+        advance(p, dist + w.x*(rectw-1));
     }
 }
 
